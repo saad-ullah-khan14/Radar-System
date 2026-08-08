@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 Radar Dashboard</title>
+    <style>
+        body { background-color: #111; color: #00ff00; font-family: monospace; text-align: center; margin-top: 50px; }
+        canvas { background-color: #000; border: 2px solid #00ff00; box-shadow: 0 0 20px #00ff00; }
+        .info { font-size: 20px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Radar System</h1>
+    <canvas id="radarCanvas" width="600" height="400"></canvas>
+    <div class="info">
+        Angle: <span id="angleVal">0</span>° | Distance: <span id="distVal">0</span> cm
+    </div>
+
+    <script>
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentAngle = 0;
+        let currentDistance = 0;
+
+        async function fetchData() {
+            try {
+                let response = await fetch('/data');
+                let data = await response.json();
+                currentAngle = data.angle;
+                currentDistance = data.distance;
+
+                document.getElementById('angleVal').innerText = currentAngle;
+                document.getElementById('distVal').innerText = currentDistance;
+            } catch (err) {
+                console.error("Error fetching data:", err);
+            }
+        }
+
+        function drawRadar() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let cx = canvas.width / 2;
+            let cy = canvas.height - 30;
+            let maxRadius = 220;
+
+            // Radar arcs draw karein
+            ctx.strokeStyle = '#003300';
+            ctx.lineWidth = 2;
+            [50, 100, 150, 200].forEach(radius => {
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
+                ctx.stroke();
+            });
+
+            // Angle ko radians mein convert karein (Left to Right sweep)
+            let rad = Math.PI + (currentAngle * Math.PI / 180);
+            
+            // Sweep line draw karein
+            let x = cx + maxRadius * Math.cos(rad);
+            let y = cy + maxRadius * Math.sin(rad);
+
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+
+            // Target object ka red dot (Distance mapping)
+            if (currentDistance > 0 && currentDistance < 300) {
+                // Distance ko pixels mein scale karein (assumption: max distance 200cm = 200px)
+                let distPixels = Math.min(currentDistance, maxRadius);
+                let ox = cx + distPixels * Math.cos(rad);
+                let oy = cy + distPixels * Math.sin(rad);
+                
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(ox, oy, 6, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        setInterval(() => {
+            fetchData();
+            drawRadar();
+        }, 50);
+    </script>
+</body>
+</html>
